@@ -1,0 +1,16 @@
+[project]
+name = "sidequest"
+version = "0.1.0"
+description = "AI-generated side quests for the world outside your screen."
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.142.2",
+    "httpx>=0.28.1",
+    "pydantic>=2.13.5",
+    "uvicorn[standard]>=0.54.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
