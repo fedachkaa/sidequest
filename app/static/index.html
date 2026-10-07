@@ -10,6 +10,7 @@
         >
         <title>SIDEQUEST — Receipt Machine</title>
         <link rel="stylesheet" href="/static/styles.css">
+        <script src="/static/progress.js" defer></script>
         <script src="/static/app.js" defer></script>
     </head>
     <body>
@@ -31,6 +32,26 @@
                         READY
                     </div>
                 </div>
+
+                <section class="field-record" aria-labelledby="field-record-title">
+                    <div class="field-record__heading">
+                        <div>
+                            <span class="machine__model">LOCAL FIELD LOG</span>
+                            <h2 id="field-record-title">Field Record</h2>
+                        </div>
+                        <span class="field-record__privacy">Stored on this device</span>
+                    </div>
+                    <div class="field-record__stats">
+                        <p><strong id="stat-xp">0</strong><span>XP</span></p>
+                        <p><strong id="stat-quests">0</strong><span>Quests</span></p>
+                        <p><strong id="stat-minutes">0</strong><span>Minutes</span></p>
+                        <p><strong id="stat-streak">0</strong><span>Day streak</span></p>
+                    </div>
+                    <div id="badge-list" class="badge-list" aria-label="Field badges"></div>
+                    <p id="storage-warning" class="storage-warning" role="status" hidden>
+                        Local storage unavailable. Progress may not persist.
+                    </p>
+                </section>
 
                 <form id="quest-form" class="control-panel">
                     <fieldset class="selector-bank">
@@ -105,6 +126,10 @@
                             <span>Print quest</span>
                             <small>Engage local AI</small>
                         </button>
+                        <button id="doomscroll-button" class="escape-button" type="button">
+                            <span>Doomscroll escape</span>
+                            <small>15 min · anywhere · surprise</small>
+                        </button>
                     </div>
                 </form>
 
@@ -142,10 +167,15 @@
 
                     <div class="receipt-actions">
                         <button id="print-receipt-button" class="utility-button" type="button">Print receipt</button>
+                        <button id="complete-quest-button" class="utility-button utility-button--complete" type="button">
+                            Complete quest
+                        </button>
                         <button id="another-quest-button" class="utility-button utility-button--quiet" type="button">
                             Another quest
                         </button>
                     </div>
+                    <p class="completion-note">Take this quest outside. When you return, mark it complete to log your progress.</p>
+                    <p id="completion-confirmation" class="completion-confirmation" role="status" aria-live="polite" hidden></p>
                 </div>
 
                 <div id="error-panel" class="error-panel" role="alert" hidden>
