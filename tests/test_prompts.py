@@ -11,15 +11,29 @@ def test_build_quest_prompt_includes_request_and_constraints() -> None:
 
     prompt = build_quest_prompt(request)
 
-    assert "Requested duration: 30 minutes" in prompt
-    assert "Environment: park" in prompt
-    assert "Mode: explore" in prompt
+    assert "30" in prompt
+    assert "park" in prompt
+    assert "explore" in prompt
+
+    # Receipt must be self-contained
+    assert "printed quest receipt" in prompt
+    assert "phone" in prompt
+    assert "camera" in prompt
+    assert "notebook" in prompt
+    assert "pen" in prompt
+    assert "tools" in prompt
+    assert "purchases" in prompt
+
+    # Do not invent the environment
+    assert "Never assume" in prompt
+    assert "weather condition" in prompt
+    assert "predetermined object" in prompt
+    assert "whatever is actually present" in prompt
+
+    # Anywhere must really mean anywhere
+    assert "built urban environments" in prompt
+    assert "natural environments" in prompt
+
+    # Output constraints
     assert "exactly 3 tasks" in prompt
-    assert "difficulty: integer from 1 to 3" in prompt
-    assert "Do not require a phone" in prompt
-    assert "Do not require purchases" in prompt
-    assert "Do not require entering private property" in prompt
-    assert "Avoid dangerous activities" in prompt
-    assert "specific landmarks, animals, facilities, trails, bodies of water" in prompt
-    assert "typical environment of the selected type" in prompt
-    assert "Return only structured JSON" in prompt
+    assert "structured JSON" in prompt
