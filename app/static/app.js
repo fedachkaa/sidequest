@@ -1,5 +1,7 @@
+const Progress = globalThis.SidequestProgress
 const form = document.querySelector('#quest-form')
 const generateButton = document.querySelector('#generate-button')
+const doomscrollButton = document.querySelector('#doomscroll-button')
 const statusMessage = document.querySelector('#status-message')
 const receiptStage = document.querySelector('#receipt-stage')
 const receiptViewport = document.querySelector('#receipt-viewport')
@@ -9,6 +11,10 @@ const errorMessage = document.querySelector('#error-message')
 const retryButton = document.querySelector('#retry-button')
 const printReceiptButton = document.querySelector('#print-receipt-button')
 const anotherQuestButton = document.querySelector('#another-quest-button')
+const completeQuestButton = document.querySelector('#complete-quest-button')
+const completionConfirmation = document.querySelector('#completion-confirmation')
+const badgeList = document.querySelector('#badge-list')
+const storageWarning = document.querySelector('#storage-warning')
 
 const loadingMessages = [
     [0, 'Contacting the local quest engine…'],
@@ -20,6 +26,9 @@ const loadingMessages = [
 let loadingTimers = []
 let lastRequest = null
 let scrollFollowFrame = null
+let currentQuest = null
+let isGenerating = false
+let progress = Progress.loadProgress(getStorage())
 
 const scrollCancelEvents = ['wheel', 'touchstart', 'pointerdown', 'keydown']
 
@@ -33,6 +42,25 @@ function readQuestRequest() {
         environment: selectedValue('environment'),
         mode: selectedValue('mode'),
     }
+}
+
+function getStorage() {
+    try {
+        return window.localStorage
+    } catch (error) {
+        return null
+    }
+}
+
+function setSelectedValue(name, value) {
+    const option = form.querySelector(`input[name="${name}"][value="${value}"]`)
+    if (option) {
+        option.checked = true
+    }
+}
+
+function showStorageWarning() {
+    storageWarning.hidden = false
 }
 
 async function fetchQuest(request) {
@@ -84,11 +112,40 @@ function renderReceipt(quest) {
     })
 }
 
+function renderProgress() {
+    const today = Progress.localDateString(new Date())
+    document.querySelector('#stat-xp').textContent = progress.totalXp
+    document.querySelector('#stat-quests').textContent = progress.completedQuests
+    document.querySelector('#stat-minutes').textContent = progress.outsideMinutes
+    document.querySelector('#stat-streak').textContent = Progress.visibleStreak(progress, today)
+
+    badgeList.replaceChildren()
+    Progress.BADGES.forEach((badge) => {
+        const isUnlocked = progress.unlockedBadges.includes(badge.id)
+        const item = document.createElement('div')
+        const marker = document.createElement('span')
+        const copy = document.createElement('div')
+        const name = document.createElement('strong')
+        const description = document.createElement('small')
+
+        item.className = `field-badge${isUnlocked ? ' is-unlocked' : ''}`
+        item.setAttribute('aria-label', `${badge.name}: ${isUnlocked ? 'unlocked' : 'locked'}. ${badge.description}`)
+        marker.className = 'field-badge__marker'
+        marker.textContent = isUnlocked ? '★' : '×'
+        name.textContent = badge.name
+        description.textContent = badge.description
+        copy.append(name, description)
+        item.append(marker, copy)
+        badgeList.append(item)
+    })
+}
+
 function startLoading() {
     stopScrollFollow()
     clearLoadingTimers()
     form.classList.add('is-loading')
     generateButton.disabled = true
+    doomscrollButton.disabled = true
     receiptStage.hidden = true
     errorPanel.hidden = true
     loadingMessages.forEach(([delay, message]) => {
@@ -104,11 +161,49 @@ function showReceipt(quest) {
     clearLoadingTimers()
     form.classList.remove('is-loading')
     generateButton.disabled = false
+    doomscrollButton.disabled = false
     statusMessage.textContent = 'Quest printed. Take it outside.'
     renderReceipt(quest)
+    completeQuestButton.disabled = false
+    completeQuestButton.textContent = 'Complete quest'
+    completionConfirmation.hidden = true
     errorPanel.hidden = true
     receiptStage.hidden = false
     dispenseReceipt()
+}
+
+function restorePendingQuest() {
+    const storedQuest = Progress.loadPendingQuest(getStorage())
+    const pendingQuest = Progress.restorablePendingQuest(progress, storedQuest)
+
+    if (storedQuest && !pendingQuest) {
+        if (!Progress.clearPendingQuest(getStorage())) {
+            showStorageWarning()
+        }
+        return
+    }
+
+    if (!pendingQuest) {
+        return
+    }
+
+    currentQuest = pendingQuest
+    lastRequest = {
+        duration_minutes: pendingQuest.duration_minutes,
+        environment: pendingQuest.environment,
+        mode: pendingQuest.mode,
+    }
+    setSelectedValue('duration', String(pendingQuest.duration_minutes))
+    setSelectedValue('environment', pendingQuest.environment)
+    setSelectedValue('mode', pendingQuest.mode)
+    renderReceipt(pendingQuest)
+    completeQuestButton.disabled = false
+    completeQuestButton.textContent = 'Complete quest'
+    completionConfirmation.hidden = true
+    receiptStage.classList.remove('is-printing')
+    receiptViewport.style.height = 'auto'
+    receiptStage.hidden = false
+    statusMessage.textContent = 'Unfinished quest restored. Ready when you return.'
 }
 
 function dispenseReceipt() {
@@ -177,6 +272,7 @@ function showError(error) {
     clearLoadingTimers()
     form.classList.remove('is-loading')
     generateButton.disabled = false
+    doomscrollButton.disabled = false
     statusMessage.textContent = 'Output interrupted. Ready to retry.'
     receiptStage.hidden = true
     errorMessage.textContent = error.message
@@ -190,15 +286,63 @@ function clearLoadingTimers() {
 }
 
 async function generateQuest(request) {
+    if (isGenerating) {
+        return
+    }
+
+    isGenerating = true
     lastRequest = request
     startLoading()
 
     try {
         const quest = await fetchQuest(request)
-        showReceipt(quest)
+        currentQuest = {
+            ...quest,
+            id: createQuestId(),
+            environment: request.environment,
+            mode: request.mode,
+        }
+        if (!Progress.savePendingQuest(getStorage(), currentQuest)) {
+            showStorageWarning()
+        }
+        showReceipt(currentQuest)
     } catch (error) {
         showError(error instanceof Error ? error : new Error('The machine could not print this quest.'))
+    } finally {
+        isGenerating = false
     }
+}
+
+function createQuestId() {
+    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
+        return globalThis.crypto.randomUUID()
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+}
+
+function completeCurrentQuest() {
+    if (!currentQuest) {
+        return
+    }
+
+    const result = Progress.completeQuest(progress, currentQuest, new Date())
+    if (!result.awarded) {
+        return
+    }
+
+    progress = result.progress
+    const isProgressSaved = Progress.saveProgress(getStorage(), progress)
+    const isPendingQuestCleared = Progress.clearPendingQuest(getStorage())
+    if (!isProgressSaved || !isPendingQuestCleared) {
+        showStorageWarning()
+    }
+    renderProgress()
+    completeQuestButton.disabled = true
+    completeQuestButton.textContent = 'Quest logged'
+
+    const badgeMessage = result.newBadges.length > 0 ? ` · ${result.newBadges.length} badge unlocked` : ''
+    completionConfirmation.textContent = `FIELD LOG UPDATED · +${result.xpAwarded} XP${badgeMessage}`
+    completionConfirmation.hidden = false
 }
 
 form.addEventListener('submit', (event) => {
@@ -209,6 +353,20 @@ form.addEventListener('submit', (event) => {
 retryButton.addEventListener('click', () => {
     generateQuest(lastRequest || readQuestRequest())
 })
+
+doomscrollButton.addEventListener('click', () => {
+    if (isGenerating) {
+        return
+    }
+
+    const request = Progress.doomscrollRequest()
+    setSelectedValue('duration', String(request.duration_minutes))
+    setSelectedValue('environment', request.environment)
+    setSelectedValue('mode', request.mode)
+    generateQuest(readQuestRequest())
+})
+
+completeQuestButton.addEventListener('click', completeCurrentQuest)
 
 printReceiptButton.addEventListener('click', () => {
     stopScrollFollow()
@@ -227,3 +385,6 @@ anotherQuestButton.addEventListener('click', () => {
 })
 
 window.addEventListener('beforeprint', stopScrollFollow)
+
+renderProgress()
+restorePendingQuest()
