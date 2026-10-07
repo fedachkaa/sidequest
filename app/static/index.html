@@ -1,0 +1,167 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="theme-color" content="#e96f32">
+        <meta
+            name="description"
+            content="SIDEQUEST is a local-AI-powered dispenser for small adventures in the real world."
+        >
+        <title>SIDEQUEST — Receipt Machine</title>
+        <link rel="stylesheet" href="/static/styles.css">
+        <script src="/static/app.js" defer></script>
+    </head>
+    <body>
+        <main class="workbench">
+            <header class="intro">
+                <p class="eyebrow">Local intelligence / real-world output</p>
+                <h1>SIDEQUEST</h1>
+                <p class="tagline">Configure a small adventure. Take the receipt. Leave the screen.</p>
+            </header>
+
+            <section class="machine" aria-labelledby="machine-name">
+                <div class="machine__topbar">
+                    <div>
+                        <span class="machine__model">SQ–01</span>
+                        <h2 id="machine-name">Receipt Machine</h2>
+                    </div>
+                    <div class="status-lamp" aria-label="Machine ready">
+                        <span></span>
+                        READY
+                    </div>
+                </div>
+
+                <form id="quest-form" class="control-panel">
+                    <fieldset class="selector-bank">
+                        <legend><span>01</span> Time outside</legend>
+                        <div class="option-grid option-grid--three">
+                            <label class="machine-option">
+                                <input type="radio" name="duration" value="15" checked>
+                                <span class="machine-option__face"><strong>15</strong><small>MIN</small></span>
+                            </label>
+                            <label class="machine-option">
+                                <input type="radio" name="duration" value="30">
+                                <span class="machine-option__face"><strong>30</strong><small>MIN</small></span>
+                            </label>
+                            <label class="machine-option">
+                                <input type="radio" name="duration" value="60">
+                                <span class="machine-option__face"><strong>60</strong><small>MIN</small></span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="selector-bank">
+                        <legend><span>02</span> Terrain</legend>
+                        <div class="option-grid option-grid--four">
+                            <label class="machine-option">
+                                <input type="radio" name="environment" value="city" checked>
+                                <span class="machine-option__face">CITY</span>
+                            </label>
+                            <label class="machine-option">
+                                <input type="radio" name="environment" value="park">
+                                <span class="machine-option__face">PARK</span>
+                            </label>
+                            <label class="machine-option">
+                                <input type="radio" name="environment" value="nature">
+                                <span class="machine-option__face">NATURE</span>
+                            </label>
+                            <label class="machine-option">
+                                <input type="radio" name="environment" value="anywhere">
+                                <span class="machine-option__face">ANYWHERE</span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <fieldset class="selector-bank">
+                        <legend><span>03</span> Quest mode</legend>
+                        <div class="option-grid option-grid--four">
+                            <label class="machine-option">
+                                <input type="radio" name="mode" value="calm">
+                                <span class="machine-option__face">CALM</span>
+                            </label>
+                            <label class="machine-option">
+                                <input type="radio" name="mode" value="move">
+                                <span class="machine-option__face">MOVE</span>
+                            </label>
+                            <label class="machine-option">
+                                <input type="radio" name="mode" value="explore" checked>
+                                <span class="machine-option__face">EXPLORE</span>
+                            </label>
+                            <label class="machine-option">
+                                <input type="radio" name="mode" value="surprise">
+                                <span class="machine-option__face">SURPRISE</span>
+                            </label>
+                        </div>
+                    </fieldset>
+
+                    <div class="action-deck">
+                        <div class="readout" role="status" aria-live="polite">
+                            <span class="readout__label">SYSTEM</span>
+                            <span id="status-message">Ready to dispense.</span>
+                        </div>
+                        <button id="generate-button" class="print-button" type="submit">
+                            <span class="print-button__light" aria-hidden="true"></span>
+                            <span>Print quest</span>
+                            <small>Engage local AI</small>
+                        </button>
+                    </div>
+                </form>
+
+                <div class="printer" aria-hidden="true">
+                    <div class="printer__screws"><span></span><span></span></div>
+                    <div class="printer__slot"><span></span></div>
+                    <p>Thermal quest output</p>
+                </div>
+
+                <div id="receipt-stage" class="receipt-stage" hidden>
+                    <div id="receipt-viewport" class="receipt-viewport">
+                        <article id="receipt" class="receipt" aria-label="Generated SIDEQUEST receipt">
+                            <header class="receipt__header">
+                                <p>==============================</p>
+                                <p class="receipt__brand">SIDEQUEST</p>
+                                <p id="receipt-number">FIELD DISPATCH</p>
+                                <p>==============================</p>
+                            </header>
+                            <h2 id="receipt-title"></h2>
+                            <div class="receipt__meta">
+                                <p><span>DURATION</span><strong id="receipt-duration"></strong></p>
+                                <p><span>DIFFICULTY</span><strong id="receipt-difficulty"></strong></p>
+                                <p><span>TYPE</span><strong id="receipt-category"></strong></p>
+                            </div>
+                            <ol id="receipt-tasks" class="receipt__tasks"></ol>
+                            <footer class="receipt__footer">
+                                <p>------------------------------</p>
+                                <strong>TAKE THE RECEIPT.</strong>
+                                <strong>LEAVE THE SCREEN.</strong>
+                                <strong>GO OUTSIDE.</strong>
+                                <p>==============================</p>
+                            </footer>
+                        </article>
+                    </div>
+
+                    <div class="receipt-actions">
+                        <button id="print-receipt-button" class="utility-button" type="button">Print receipt</button>
+                        <button id="another-quest-button" class="utility-button utility-button--quiet" type="button">
+                            Another quest
+                        </button>
+                    </div>
+                </div>
+
+                <div id="error-panel" class="error-panel" role="alert" hidden>
+                    <span class="error-panel__code">OUTPUT JAM</span>
+                    <h2>Quest could not be printed.</h2>
+                    <p id="error-message">The machine needs another try.</p>
+                    <button id="retry-button" class="utility-button" type="button">Retry request</button>
+                </div>
+
+                <div class="machine__feet" aria-hidden="true"><span></span><span></span></div>
+            </section>
+
+            <footer class="page-footer">
+                <span>Runs locally via Ollama + Gemma</span>
+                <span>No account · No tracking · No phone required</span>
+            </footer>
+        </main>
+    </body>
+</html>
