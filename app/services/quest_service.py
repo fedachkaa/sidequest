@@ -1,3 +1,8 @@
+from json import JSONDecodeError
+
+import httpx
+from pydantic import ValidationError
+
 from app.ai.ollama_client import OllamaClient
 from app.models.quest import Quest, QuestRequest
 
@@ -10,11 +15,32 @@ class QuestDurationMismatchError(Exception):
         )
 
 
+class QuestGenerationError(Exception):
+    pass
+
+
 class QuestService:
     def __init__(self, ollama_client: OllamaClient) -> None:
         self.ollama_client = ollama_client
 
     def generate_quest(self, request: QuestRequest) -> Quest:
+        for attempt in range(2):
+            try:
+                return self._generate_quest(request)
+            except (
+                httpx.HTTPError,
+                ValidationError,
+                JSONDecodeError,
+                KeyError,
+                TypeError,
+                QuestDurationMismatchError,
+            ) as error:
+                if attempt == 1:
+                    raise QuestGenerationError from error
+
+        raise QuestGenerationError
+
+    def _generate_quest(self, request: QuestRequest) -> Quest:
         quest = self.ollama_client.generate_quest(request)
 
         if quest.duration_minutes != request.duration_minutes:

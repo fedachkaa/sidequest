@@ -9,8 +9,7 @@ from app.ai.ollama_client import OllamaClient
 from app.models.quest import Environment, Mode, Quest, QuestRequest
 
 
-# MODELS = ("gemma3:1b", "gemma3:4b")
-MODELS = ("gemma3:4b",)
+MODELS = ("gemma3:1b", "gemma3:4b")
 SCENARIOS = (
     QuestRequest(duration_minutes=15, environment=Environment.CITY, mode=Mode.EXPLORE),
     QuestRequest(duration_minutes=15, environment=Environment.PARK, mode=Mode.CALM),
