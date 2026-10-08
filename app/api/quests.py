@@ -1,12 +1,13 @@
 import logging
-from typing import Annotated
 from datetime import datetime
 from sqlite3 import Error as SQLiteError
+from typing import Annotated
 from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.ai.ollama_client import OllamaClient
+from app.api.errors import service_unavailable
 from app.dependencies import get_repository
 from app.models.progress import QuestCompletionResponse
 from app.models.quest import QuestRequest, StoredQuest
@@ -17,13 +18,6 @@ from app.services.quest_service import QuestGenerationError, QuestService
 
 router = APIRouter(prefix="/api/quests", tags=["quests"])
 logger = logging.getLogger(__name__)
-
-
-def unavailable_error(code: str, message: str) -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-        detail={"code": code, "message": message},
-    )
 
 
 def get_quest_service() -> QuestService:
@@ -46,13 +40,13 @@ def generate_quest(
         )
     except QuestGenerationError as error:
         logger.exception("Quest generation failed")
-        raise unavailable_error(
+        raise service_unavailable(
             "QUEST_ENGINE_UNAVAILABLE",
             "The local quest engine is unavailable right now.",
         ) from error
     except SQLiteError as error:
         logger.exception("Failed to persist generated quest")
-        raise unavailable_error(
+        raise service_unavailable(
             "PERSISTENCE_UNAVAILABLE",
             "The field record is unavailable right now.",
         ) from error
@@ -67,7 +61,7 @@ def get_quest_status(
         quest = repository.get_quest(quest_id)
     except SQLiteError as error:
         logger.exception("Failed to retrieve quest status")
-        raise unavailable_error(
+        raise service_unavailable(
             "PERSISTENCE_UNAVAILABLE",
             "The quest status is unavailable right now.",
         ) from error
@@ -93,7 +87,7 @@ def complete_quest(
         ) from error
     except SQLiteError as error:
         logger.exception("Failed to complete quest")
-        raise unavailable_error(
+        raise service_unavailable(
             "PERSISTENCE_UNAVAILABLE",
             "The completion could not be saved right now.",
         ) from error

@@ -1,11 +1,10 @@
 const test = require('node:test')
 const assert = require('node:assert/strict')
 
-require('../app/static/progress.js')
+const progressModule = import('../app/static/progress-core.mjs')
 
-const Progress = globalThis.SidequestProgress
-
-test('provides the backend progress empty state shape', () => {
+test('provides the backend progress empty state shape', async () => {
+    const Progress = await progressModule
     assert.deepEqual(Progress.emptyProgress(), {
         total_xp: 0,
         completed_quests: 0,
@@ -18,7 +17,8 @@ test('provides the backend progress empty state shape', () => {
     })
 })
 
-test('renders exactly the six backend badge identifiers', () => {
+test('renders exactly the six backend badge identifiers', async () => {
+    const Progress = await progressModule
     assert.deepEqual(
         Progress.BADGES.map((badge) => badge.id),
         [
@@ -32,7 +32,8 @@ test('renders exactly the six backend badge identifiers', () => {
     )
 })
 
-test('doomscroll escape keeps its fixed API request parameters', () => {
+test('doomscroll escape keeps its fixed API request parameters', async () => {
+    const Progress = await progressModule
     assert.deepEqual(Progress.doomscrollRequest(), {
         duration_minutes: 15,
         environment: 'anywhere',
@@ -40,7 +41,8 @@ test('doomscroll escape keeps its fixed API request parameters', () => {
     })
 })
 
-test('generation and completion are unavailable during initialization or another mutation', () => {
+test('generation and completion are unavailable during initialization or another mutation', async () => {
+    const Progress = await progressModule
     assert.equal(
         Progress.operationAvailable({ isInitializing: true, isGenerating: false, isCompleting: false }),
         false,
@@ -59,7 +61,8 @@ test('generation and completion are unavailable during initialization or another
     )
 })
 
-test('maps stable API error identifiers to accurate messages', () => {
+test('maps stable API error identifiers to accurate messages', async () => {
+    const Progress = await progressModule
     assert.equal(
         Progress.errorMessage('QUEST_ENGINE_UNAVAILABLE', 'fallback'),
         'The local quest engine is unavailable right now.',
@@ -71,7 +74,8 @@ test('maps stable API error identifiers to accurate messages', () => {
     assert.equal(Progress.errorMessage('UNKNOWN', 'fallback'), 'fallback')
 })
 
-test('completion reconciliation handles every persisted quest status', () => {
+test('completion reconciliation handles every persisted quest status', async () => {
+    const Progress = await progressModule
     assert.equal(Progress.completionResolution('completed'), 'completed')
     assert.equal(Progress.completionResolution('pending'), 'retry')
     assert.equal(Progress.completionResolution('superseded'), 'superseded')

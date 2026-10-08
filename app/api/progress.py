@@ -1,9 +1,10 @@
 import logging
-from typing import Annotated
 from sqlite3 import Error as SQLiteError
+from typing import Annotated
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 
+from app.api.errors import service_unavailable
 from app.dependencies import get_repository
 from app.models.progress import ProgressResponse
 from app.persistence.sqlite_repository import SQLiteRepository
@@ -22,10 +23,7 @@ def get_progress(
         return ProgressService(repository).get_progress()
     except SQLiteError as error:
         logger.exception("Failed to retrieve progress")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "code": "PERSISTENCE_UNAVAILABLE",
-                "message": "The field record is unavailable right now.",
-            },
+        raise service_unavailable(
+            "PERSISTENCE_UNAVAILABLE",
+            "The field record is unavailable right now.",
         ) from error
