@@ -17,6 +17,7 @@ def test_receipt_machine_is_served_at_root() -> None:
     assert 'id="quest-form"' in response.text
     assert "⚡ Doomscroll escape" in response.text
     assert "15-min emergency quest" in response.text
+    assert '<link rel="icon" href="/static/favicon.svg" type="image/svg+xml">' in response.text
 
 
 def test_frontend_static_assets_are_served() -> None:
@@ -26,6 +27,8 @@ def test_frontend_static_assets_are_served() -> None:
     receipt_script_response = client.get("/static/receipt-ui.js")
     progress_script_response = client.get("/static/progress-ui.js")
     progress_core_response = client.get("/static/progress-core.mjs")
+    favicon_response = client.get("/static/favicon.svg")
+    fallback_favicon_response = client.get("/favicon.ico")
 
     assert stylesheet_response.status_code == 200
     assert stylesheet_response.headers["content-type"].startswith("text/css")
@@ -39,6 +42,10 @@ def test_frontend_static_assets_are_served() -> None:
     assert receipt_script_response.status_code == 200
     assert progress_script_response.status_code == 200
     assert progress_core_response.status_code == 200
+    assert favicon_response.status_code == 200
+    assert favicon_response.headers["content-type"].startswith("image/svg+xml")
+    assert fallback_favicon_response.status_code == 200
+    assert fallback_favicon_response.headers["content-type"].startswith("image/svg+xml")
 
 
 def test_frontend_module_imports_are_served() -> None:
@@ -63,4 +70,5 @@ def test_frontend_module_imports_are_served() -> None:
         "/static/progress-core.mjs",
         "/static/progress-ui.js",
         "/static/receipt-ui.js",
+        "/static/replacement-flow.mjs",
     }

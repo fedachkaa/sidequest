@@ -1,5 +1,6 @@
 import {
     completeQuest,
+    discardQuest,
     fetchProgress,
     fetchQuestStatus,
     generateQuest as requestQuest,
@@ -24,6 +25,7 @@ import {
     stopScrollFollow,
 } from './receipt-ui.js'
 import * as Progress from './progress-core.mjs'
+import { replaceQuest } from './replacement-flow.mjs'
 
 const form = document.querySelector('#quest-form')
 const generateButton = document.querySelector('#generate-button')
@@ -266,11 +268,56 @@ doomscrollButton.addEventListener('click', () => {
 completeQuestButton.addEventListener('click', completeCurrentQuest)
 printReceiptButton.addEventListener('click', printReceipt)
 
-anotherQuestButton.addEventListener('click', () => {
-    prepareAnotherReceipt()
-    statusMessage.textContent = 'Selections retained. Ready for another.'
-    generateButton.focus()
-    form.scrollIntoView({ behavior: 'smooth', block: 'start' })
+anotherQuestButton.addEventListener('click', async () => {
+    await initializationPromise
+    if (
+        !currentQuest ||
+        !Progress.operationAvailable({ isInitializing, isGenerating, isCompleting })
+    ) {
+        return
+    }
+
+    isGenerating = true
+    generateButton.disabled = true
+    doomscrollButton.disabled = true
+    anotherQuestButton.disabled = true
+    setCompletionDisabled(true)
+    statusMessage.textContent = 'Discarding unfinished quest…'
+
+    const discardedQuest = currentQuest
+    const request = readQuestRequest()
+    let isDiscarded = false
+    lastRequest = request
+
+    try {
+        currentQuest = await replaceQuest({
+            questId: discardedQuest.id,
+            request,
+            discardQuest,
+            generateQuest: requestQuest,
+            onDiscarded: () => {
+                isDiscarded = true
+                currentQuest = null
+                prepareAnotherReceipt()
+                hideWarning()
+                startLoading()
+            },
+        })
+        displayQuest(currentQuest)
+    } catch (error) {
+        if (isDiscarded) {
+            showError(error instanceof Error ? error : new Error('The machine could not print this quest.'))
+        } else {
+            statusMessage.textContent = 'Quest could not be discarded. Ready to retry.'
+            setCompletionDisabled(false)
+            showWarning(error instanceof Error ? error.message : 'The quest could not be discarded. Please try again.')
+        }
+    } finally {
+        isGenerating = false
+        generateButton.disabled = false
+        doomscrollButton.disabled = false
+        anotherQuestButton.disabled = false
+    }
 })
 
 window.addEventListener('beforeprint', stopScrollFollow)

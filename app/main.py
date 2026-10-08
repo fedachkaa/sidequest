@@ -44,6 +44,11 @@ def receipt_machine() -> FileResponse:
     return FileResponse(STATIC_DIRECTORY / "index.html")
 
 
+@app.get("/favicon.ico", include_in_schema=False, response_class=FileResponse)
+def favicon() -> FileResponse:
+    return FileResponse(STATIC_DIRECTORY / "favicon.svg", media_type="image/svg+xml")
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok"}

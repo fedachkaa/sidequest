@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from app.models.progress import Progress, ProgressResponse, QuestCompletionResponse
 from app.models.quest import StoredQuest
-from app.persistence.sqlite_repository import CompletionStatus, SQLiteRepository
+from app.persistence.sqlite_repository import CompletionStatus, DiscardStatus, SQLiteRepository
 
 
 XP_BY_DURATION = {15: 50, 30: 100, 60: 200}
@@ -60,6 +60,10 @@ class ProgressService:
             awarded_xp=awarded_xp,
             new_badges=new_badges,
         )
+
+    def discard_quest(self, quest_id: str) -> None:
+        discard_status = self.repository.discard_quest(quest_id)
+        self._raise_for_discard_status(discard_status)
 
     def _updated_progress(
         self,
@@ -122,4 +126,10 @@ class ProgressService:
         if completion_status == "unknown":
             raise QuestNotFoundError
         if completion_status == "not_pending":
+            raise QuestNotPendingError
+
+    def _raise_for_discard_status(self, discard_status: DiscardStatus) -> None:
+        if discard_status == "unknown":
+            raise QuestNotFoundError
+        if discard_status == "not_pending":
             raise QuestNotPendingError
