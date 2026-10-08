@@ -11,15 +11,16 @@ from app.models.quest import Quest, QuestRequest, StoredQuest
 
 
 CompletionStatus = Literal["completed", "unknown", "not_pending"]
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "sidequest.db"
 
 
 class SQLiteRepository:
     def __init__(self, database_path: Path) -> None:
         self.database_path = database_path
-        self.database_path.parent.mkdir(parents=True, exist_ok=True)
-        self.initialize()
 
     def initialize(self) -> None:
+        self.database_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as connection:
             connection.executescript(
                 """
@@ -190,4 +191,9 @@ class SQLiteRepository:
 
 
 def database_path_from_environment() -> Path:
-    return Path(os.environ.get("SIDEQUEST_DB_PATH", "data/sidequest.db"))
+    configured_path = os.environ.get("SIDEQUEST_DB_PATH")
+    if not configured_path:
+        return DEFAULT_DATABASE_PATH
+
+    path = Path(configured_path).expanduser()
+    return path if path.is_absolute() else PROJECT_ROOT / path

@@ -1,3 +1,4 @@
+import logging
 from typing import Annotated
 from sqlite3 import Error as SQLiteError
 
@@ -10,6 +11,7 @@ from app.services.progress_service import ProgressService
 
 
 router = APIRouter(tags=["progress"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/api/progress", response_model=ProgressResponse)
@@ -19,7 +21,11 @@ def get_progress(
     try:
         return ProgressService(repository).get_progress()
     except SQLiteError as error:
+        logger.exception("Failed to retrieve progress")
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Unable to load progress right now. Please try again.",
+            detail={
+                "code": "PERSISTENCE_UNAVAILABLE",
+                "message": "The field record is unavailable right now.",
+            },
         ) from error

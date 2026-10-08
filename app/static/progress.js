@@ -33,8 +33,21 @@
         return !state.isInitializing && !state.isGenerating && !state.isCompleting
     }
 
-    function isSamePendingQuest(pendingQuest, questId) {
-        return Boolean(pendingQuest && pendingQuest.id === questId)
+    function errorMessage(code, fallback) {
+        const messages = {
+            QUEST_ENGINE_UNAVAILABLE: 'The local quest engine is unavailable right now.',
+            PERSISTENCE_UNAVAILABLE: 'The field record is unavailable right now.',
+        }
+        return messages[code] || fallback
+    }
+
+    function completionResolution(status) {
+        const resolutions = {
+            completed: 'completed',
+            pending: 'retry',
+            superseded: 'superseded',
+        }
+        return resolutions[status] || 'unknown'
     }
 
     globalScope.SidequestProgress = {
@@ -42,6 +55,7 @@
         emptyProgress,
         doomscrollRequest,
         operationAvailable,
-        isSamePendingQuest,
+        errorMessage,
+        completionResolution,
     }
 })(typeof globalThis === 'undefined' ? window : globalThis)

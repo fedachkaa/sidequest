@@ -59,8 +59,21 @@ test('generation and completion are unavailable during initialization or another
     )
 })
 
-test('completion reconciliation identifies whether the attempted quest remains pending', () => {
-    assert.equal(Progress.isSamePendingQuest({ id: 'quest-1' }, 'quest-1'), true)
-    assert.equal(Progress.isSamePendingQuest({ id: 'quest-2' }, 'quest-1'), false)
-    assert.equal(Progress.isSamePendingQuest(null, 'quest-1'), false)
+test('maps stable API error identifiers to accurate messages', () => {
+    assert.equal(
+        Progress.errorMessage('QUEST_ENGINE_UNAVAILABLE', 'fallback'),
+        'The local quest engine is unavailable right now.',
+    )
+    assert.equal(
+        Progress.errorMessage('PERSISTENCE_UNAVAILABLE', 'fallback'),
+        'The field record is unavailable right now.',
+    )
+    assert.equal(Progress.errorMessage('UNKNOWN', 'fallback'), 'fallback')
+})
+
+test('completion reconciliation handles every persisted quest status', () => {
+    assert.equal(Progress.completionResolution('completed'), 'completed')
+    assert.equal(Progress.completionResolution('pending'), 'retry')
+    assert.equal(Progress.completionResolution('superseded'), 'superseded')
+    assert.equal(Progress.completionResolution('unexpected'), 'unknown')
 })

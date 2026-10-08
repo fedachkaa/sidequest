@@ -11,6 +11,12 @@ from app.persistence.sqlite_repository import SQLiteRepository
 from app.services.progress_service import ProgressService, QuestNotPendingError
 
 
+def initialized_repository(database_path: Path) -> SQLiteRepository:
+    repository = SQLiteRepository(database_path)
+    repository.initialize()
+    return repository
+
+
 def request(
     duration_minutes: int = 30,
     environment: Environment = Environment.CITY,
@@ -50,10 +56,10 @@ def save_quest(
 
 def test_database_initializes_and_persists_after_reopening(tmp_path: Path) -> None:
     database_path = tmp_path / "nested" / "sidequest.db"
-    repository = SQLiteRepository(database_path)
+    repository = initialized_repository(database_path)
     quest_id = save_quest(repository)
 
-    reopened = SQLiteRepository(database_path)
+    reopened = initialized_repository(database_path)
 
     assert database_path.exists()
     assert reopened.get_pending_quest().id == quest_id
@@ -61,7 +67,7 @@ def test_database_initializes_and_persists_after_reopening(tmp_path: Path) -> No
 
 
 def test_new_quest_supersedes_previous_pending_quest(tmp_path: Path) -> None:
-    repository = SQLiteRepository(tmp_path / "sidequest.db")
+    repository = initialized_repository(tmp_path / "sidequest.db")
     first_id = save_quest(repository)
     second_id = save_quest(repository, request(environment=Environment.PARK))
 
@@ -81,7 +87,7 @@ def test_completion_awards_expected_xp_once(
     duration_minutes: int,
     expected_xp: int,
 ) -> None:
-    repository = SQLiteRepository(tmp_path / f"{duration_minutes}.db")
+    repository = initialized_repository(tmp_path / f"{duration_minutes}.db")
     quest_id = save_quest(repository, request(duration_minutes=duration_minutes))
     service = ProgressService(repository)
 
@@ -95,7 +101,7 @@ def test_completion_awards_expected_xp_once(
 
 
 def test_streak_handles_same_consecutive_and_missed_days(tmp_path: Path) -> None:
-    repository = SQLiteRepository(tmp_path / "sidequest.db")
+    repository = initialized_repository(tmp_path / "sidequest.db")
     service = ProgressService(repository)
 
     first_id = save_quest(repository)
@@ -115,7 +121,7 @@ def test_streak_handles_same_consecutive_and_missed_days(tmp_path: Path) -> None
 
 
 def test_streak_handles_year_boundary(tmp_path: Path) -> None:
-    repository = SQLiteRepository(tmp_path / "sidequest.db")
+    repository = initialized_repository(tmp_path / "sidequest.db")
     service = ProgressService(repository)
 
     first_id = save_quest(repository)
@@ -127,7 +133,7 @@ def test_streak_handles_year_boundary(tmp_path: Path) -> None:
 
 
 def test_streak_increments_across_device_local_midnight(tmp_path: Path) -> None:
-    repository = SQLiteRepository(tmp_path / "sidequest.db")
+    repository = initialized_repository(tmp_path / "sidequest.db")
     service = ProgressService(repository)
     device_timezone = timezone(timedelta(hours=2))
 
@@ -146,7 +152,7 @@ def test_streak_increments_across_device_local_midnight(tmp_path: Path) -> None:
 
 
 def test_all_badges_unlock_and_remain_persisted(tmp_path: Path) -> None:
-    repository = SQLiteRepository(tmp_path / "sidequest.db")
+    repository = initialized_repository(tmp_path / "sidequest.db")
     service = ProgressService(repository)
     environments = [Environment.CITY, Environment.PARK, Environment.NATURE]
 
@@ -158,7 +164,7 @@ def test_all_badges_unlock_and_remain_persisted(tmp_path: Path) -> None:
         completion_day = min(index + 1, 3)
         service.complete_quest(quest_id, datetime(2026, 10, completion_day, 12))
 
-    progress = SQLiteRepository(repository.database_path).get_progress()
+    progress = initialized_repository(repository.database_path).get_progress()
 
     assert progress.completed_quests == 10
     assert progress.outside_minutes == 150
@@ -173,7 +179,7 @@ def test_all_badges_unlock_and_remain_persisted(tmp_path: Path) -> None:
 
 
 def test_concurrent_completion_awards_only_once(tmp_path: Path) -> None:
-    repository = SQLiteRepository(tmp_path / "sidequest.db")
+    repository = initialized_repository(tmp_path / "sidequest.db")
     quest_id = save_quest(repository)
 
     def complete() -> str:

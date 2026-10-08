@@ -59,6 +59,15 @@ function showPersistenceWarning(message) {
     persistenceWarning.hidden = false
 }
 
+async function responseError(response, fallback) {
+    try {
+        const payload = await response.json()
+        return new Error(Progress.errorMessage(payload.detail?.code, fallback))
+    } catch (error) {
+        return new Error(fallback)
+    }
+}
+
 async function fetchQuest(request) {
     const response = await fetch('/api/quests/generate', {
         method: 'POST',
@@ -67,7 +76,7 @@ async function fetchQuest(request) {
     })
 
     if (!response.ok) {
-        throw new Error(response.status === 503 ? 'The local quest engine is unavailable right now.' : 'The machine received an unexpected response.')
+        throw await responseError(response, 'The machine received an unexpected response.')
     }
 
     const quest = await response.json()
@@ -81,7 +90,15 @@ async function fetchQuest(request) {
 async function fetchProgress() {
     const response = await fetch('/api/progress')
     if (!response.ok) {
-        throw new Error('The field record could not be loaded.')
+        throw await responseError(response, 'The field record could not be loaded.')
+    }
+    return response.json()
+}
+
+async function fetchQuestStatus(questId) {
+    const response = await fetch(`/api/quests/${encodeURIComponent(questId)}`)
+    if (!response.ok) {
+        throw await responseError(response, 'The quest status could not be confirmed.')
     }
     return response.json()
 }
@@ -355,29 +372,49 @@ async function completeCurrentQuest() {
 
 async function reconcileCompletion(completingQuest) {
     try {
-        progress = await fetchProgress()
-        renderProgress()
+        const savedQuest = await fetchQuestStatus(completingQuest.id)
+        const resolution = Progress.completionResolution(savedQuest.status)
 
-        if (Progress.isSamePendingQuest(progress.pending_quest, completingQuest.id)) {
+        if (resolution === 'completed') {
+            currentQuest = null
+            completeQuestButton.disabled = true
+            completeQuestButton.textContent = 'Quest logged'
+            completionConfirmation.textContent = 'QUEST COMPLETION CONFIRMED · FIELD LOG UPDATED'
+            completionConfirmation.hidden = false
+            statusMessage.textContent = 'Quest completion confirmed.'
+            persistenceWarning.hidden = true
+            try {
+                progress = await fetchProgress()
+                renderProgress()
+            } catch (error) {
+                showPersistenceWarning('Completion was confirmed, but progress could not be refreshed.')
+            }
+            return
+        }
+
+        if (resolution === 'retry') {
             currentQuest = completingQuest
             completeQuestButton.disabled = false
             showPersistenceWarning('Completion was not confirmed. Please try again.')
             return
         }
 
-        currentQuest = progress.pending_quest
-        if (currentQuest) {
-            restorePendingQuest(currentQuest)
-        } else {
+        if (resolution === 'superseded') {
+            currentQuest = null
             completeQuestButton.disabled = true
-            completeQuestButton.textContent = 'Quest status updated'
-            statusMessage.textContent = 'Quest is no longer pending. Field record refreshed.'
+            completeQuestButton.textContent = 'Quest superseded'
+            statusMessage.textContent = 'This quest was replaced and is no longer eligible for completion.'
+            showPersistenceWarning('This quest was superseded by a newer quest and cannot be completed.')
+            return
         }
-        showPersistenceWarning('Connection interrupted. Field record refreshed from the device.')
+
+        currentQuest = completingQuest
+        completeQuestButton.disabled = false
+        showPersistenceWarning('The device returned an unknown quest status. Completion was not confirmed.')
     } catch (error) {
         currentQuest = completingQuest
         completeQuestButton.disabled = false
-        showPersistenceWarning('Could not confirm completion. Check the connection and try again.')
+        showPersistenceWarning('Could not confirm whether completion was saved. Check the connection before retrying.')
     }
 }
 
