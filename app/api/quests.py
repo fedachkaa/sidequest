@@ -71,6 +71,28 @@ def get_quest_status(
     return quest
 
 
+@router.delete("/{quest_id}", status_code=status.HTTP_204_NO_CONTENT)
+def discard_quest(
+    quest_id: str,
+    repository: Annotated[SQLiteRepository, Depends(get_repository)],
+) -> None:
+    try:
+        ProgressService(repository).discard_quest(quest_id)
+    except QuestNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quest not found.") from error
+    except QuestNotPendingError as error:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Quest is not available for discard.",
+        ) from error
+    except SQLiteError as error:
+        logger.exception("Failed to discard quest")
+        raise service_unavailable(
+            "PERSISTENCE_UNAVAILABLE",
+            "The quest could not be discarded right now.",
+        ) from error
+
+
 @router.post("/{quest_id}/complete", response_model=QuestCompletionResponse)
 def complete_quest(
     quest_id: str,

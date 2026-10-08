@@ -67,3 +67,12 @@ export async function completeQuest(questId) {
     }
     return response.json()
 }
+
+export async function discardQuest(questId) {
+    const response = await fetch(`/api/quests/${encodeURIComponent(questId)}`, {
+        method: 'DELETE',
+    })
+    if (!response.ok) {
+        throw await responseError(response, 'The quest could not be discarded. Please try again.')
+    }
+}

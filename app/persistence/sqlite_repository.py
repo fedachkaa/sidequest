@@ -11,6 +11,7 @@ from app.models.quest import Quest, QuestRequest, StoredQuest
 
 
 CompletionStatus = Literal["completed", "unknown", "not_pending"]
+DiscardStatus = Literal["discarded", "unknown", "not_pending"]
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_DATABASE_PATH = PROJECT_ROOT / "data" / "sidequest.db"
 
@@ -112,6 +113,24 @@ class SQLiteRepository:
         with self._connect() as connection:
             row = connection.execute("SELECT * FROM progress WHERE id = 1").fetchone()
         return self._progress_from_row(row)
+
+    def discard_quest(self, quest_id: str) -> DiscardStatus:
+        with self._connect() as connection:
+            connection.execute("BEGIN IMMEDIATE")
+            row = connection.execute(
+                "SELECT status FROM quests WHERE id = ?",
+                (quest_id,),
+            ).fetchone()
+            if row is None:
+                return "unknown"
+            if row["status"] != "pending":
+                return "not_pending"
+
+            connection.execute(
+                "DELETE FROM quests WHERE id = ? AND status = 'pending'",
+                (quest_id,),
+            )
+        return "discarded"
 
     def complete_quest(
         self,

@@ -8,7 +8,7 @@ import pytest
 from app.models.progress import Progress
 from app.models.quest import Environment, Mode, Quest, QuestRequest
 from app.persistence.sqlite_repository import SQLiteRepository
-from app.services.progress_service import ProgressService, QuestNotPendingError
+from app.services.progress_service import ProgressService, QuestNotFoundError, QuestNotPendingError
 
 
 def initialized_repository(database_path: Path) -> SQLiteRepository:
@@ -76,6 +76,33 @@ def test_new_quest_supersedes_previous_pending_quest(tmp_path: Path) -> None:
 
     with pytest.raises(QuestNotPendingError):
         ProgressService(repository).complete_quest(first_id)
+
+
+def test_discard_removes_only_pending_quest(tmp_path: Path) -> None:
+    repository = initialized_repository(tmp_path / "sidequest.db")
+    quest_id = save_quest(repository)
+    service = ProgressService(repository)
+
+    service.discard_quest(quest_id)
+
+    assert repository.get_quest(quest_id) is None
+    assert repository.get_pending_quest() is None
+    with pytest.raises(QuestNotFoundError):
+        service.complete_quest(quest_id)
+
+
+def test_completed_quest_and_progress_cannot_be_discarded(tmp_path: Path) -> None:
+    repository = initialized_repository(tmp_path / "sidequest.db")
+    quest_id = save_quest(repository)
+    service = ProgressService(repository)
+    service.complete_quest(quest_id, datetime(2026, 10, 8, 12))
+    progress_before_discard = repository.get_progress()
+
+    with pytest.raises(QuestNotPendingError):
+        service.discard_quest(quest_id)
+
+    assert repository.get_quest(quest_id).status == "completed"
+    assert repository.get_progress() == progress_before_discard
 
 
 @pytest.mark.parametrize(
