@@ -1,3 +1,5 @@
+import re
+
 from fastapi.testclient import TestClient
 
 from app.main import app
@@ -20,14 +22,45 @@ def test_receipt_machine_is_served_at_root() -> None:
 def test_frontend_static_assets_are_served() -> None:
     stylesheet_response = client.get("/static/styles.css")
     script_response = client.get("/static/app.js")
-    progress_script_response = client.get("/static/progress.js")
+    api_script_response = client.get("/static/api-client.js")
+    receipt_script_response = client.get("/static/receipt-ui.js")
+    progress_script_response = client.get("/static/progress-ui.js")
+    progress_core_response = client.get("/static/progress-core.mjs")
 
     assert stylesheet_response.status_code == 200
     assert stylesheet_response.headers["content-type"].startswith("text/css")
     assert script_response.status_code == 200
     assert "javascript" in script_response.headers["content-type"]
-    assert "/api/progress" in script_response.text
-    assert "/complete" in script_response.text
+    assert 'type="module" src="/static/app.js"' in client.get("/").text
     assert "localStorage" not in script_response.text
+    assert api_script_response.status_code == 200
+    assert "/api/progress" in api_script_response.text
+    assert "/complete" in api_script_response.text
+    assert receipt_script_response.status_code == 200
     assert progress_script_response.status_code == 200
-    assert "javascript" in progress_script_response.headers["content-type"]
+    assert progress_core_response.status_code == 200
+
+
+def test_frontend_module_imports_are_served() -> None:
+    pending_paths = ["/static/app.js"]
+    checked_paths: set[str] = set()
+
+    while pending_paths:
+        path = pending_paths.pop()
+        if path in checked_paths:
+            continue
+
+        response = client.get(path)
+        assert response.status_code == 200
+        checked_paths.add(path)
+
+        for relative_path in re.findall(r"from ['\"](\./[^'\"]+)['\"]", response.text):
+            pending_paths.append(f"/static/{relative_path.removeprefix('./')}")
+
+    assert checked_paths == {
+        "/static/api-client.js",
+        "/static/app.js",
+        "/static/progress-core.mjs",
+        "/static/progress-ui.js",
+        "/static/receipt-ui.js",
+    }
