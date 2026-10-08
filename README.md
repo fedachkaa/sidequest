@@ -14,6 +14,10 @@ The current implementation is a browser-based simulation of that device, powered
 
 Built for the **Hacktoberfest 2026 — Touch Grass Challenge**.
 
+## Demo
+
+https://github.com/user-attachments/assets/d3117a55-5f4a-42ad-a658-3522ca035141
+
 ## Preview
 
 ![SIDEQUEST Receipt Machine](docs/images/sidequest-machine.png)
