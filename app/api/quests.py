@@ -1,28 +1,99 @@
+import logging
 from typing import Annotated
+from datetime import datetime
+from sqlite3 import Error as SQLiteError
+from uuid import uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, status
 
 from app.ai.ollama_client import OllamaClient
-from app.models.quest import Quest, QuestRequest
+from app.dependencies import get_repository
+from app.models.progress import QuestCompletionResponse
+from app.models.quest import QuestRequest, StoredQuest
+from app.persistence.sqlite_repository import SQLiteRepository
+from app.services.progress_service import ProgressService, QuestNotFoundError, QuestNotPendingError
 from app.services.quest_service import QuestGenerationError, QuestService
 
 
 router = APIRouter(prefix="/api/quests", tags=["quests"])
+logger = logging.getLogger(__name__)
+
+
+def unavailable_error(code: str, message: str) -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail={"code": code, "message": message},
+    )
 
 
 def get_quest_service() -> QuestService:
     return QuestService(OllamaClient())
 
 
-@router.post("/generate", response_model=Quest)
+@router.post("/generate", response_model=StoredQuest)
 def generate_quest(
     request: QuestRequest,
     quest_service: Annotated[QuestService, Depends(get_quest_service)],
-) -> Quest:
+    repository: Annotated[SQLiteRepository, Depends(get_repository)],
+) -> StoredQuest:
     try:
-        return quest_service.generate_quest(request)
+        quest = quest_service.generate_quest(request)
+        return repository.save_generated_quest(
+            quest_id=str(uuid4()),
+            request=request,
+            quest=quest,
+            created_at=datetime.now().astimezone(),
+        )
     except QuestGenerationError as error:
+        logger.exception("Quest generation failed")
+        raise unavailable_error(
+            "QUEST_ENGINE_UNAVAILABLE",
+            "The local quest engine is unavailable right now.",
+        ) from error
+    except SQLiteError as error:
+        logger.exception("Failed to persist generated quest")
+        raise unavailable_error(
+            "PERSISTENCE_UNAVAILABLE",
+            "The field record is unavailable right now.",
+        ) from error
+
+
+@router.get("/{quest_id}", response_model=StoredQuest)
+def get_quest_status(
+    quest_id: str,
+    repository: Annotated[SQLiteRepository, Depends(get_repository)],
+) -> StoredQuest:
+    try:
+        quest = repository.get_quest(quest_id)
+    except SQLiteError as error:
+        logger.exception("Failed to retrieve quest status")
+        raise unavailable_error(
+            "PERSISTENCE_UNAVAILABLE",
+            "The quest status is unavailable right now.",
+        ) from error
+
+    if quest is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quest not found.")
+    return quest
+
+
+@router.post("/{quest_id}/complete", response_model=QuestCompletionResponse)
+def complete_quest(
+    quest_id: str,
+    repository: Annotated[SQLiteRepository, Depends(get_repository)],
+) -> QuestCompletionResponse:
+    try:
+        return ProgressService(repository).complete_quest(quest_id)
+    except QuestNotFoundError as error:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Quest not found.") from error
+    except QuestNotPendingError as error:
         raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Unable to generate a quest right now. Please try again.",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Quest is not available for completion.",
+        ) from error
+    except SQLiteError as error:
+        logger.exception("Failed to complete quest")
+        raise unavailable_error(
+            "PERSISTENCE_UNAVAILABLE",
+            "The completion could not be saved right now.",
         ) from error

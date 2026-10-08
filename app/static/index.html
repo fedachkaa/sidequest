@@ -48,8 +48,8 @@
                         <p><strong id="stat-streak">0</strong><span>Day streak</span></p>
                     </div>
                     <div id="badge-list" class="badge-list" aria-label="Field badges"></div>
-                    <p id="storage-warning" class="storage-warning" role="status" hidden>
-                        Local storage unavailable. Progress may not persist.
+                    <p id="persistence-warning" class="storage-warning" role="status" hidden>
+                        Field record unavailable. Please try again.
                     </p>
                 </section>
 
@@ -121,15 +121,17 @@
                             <span class="readout__label">SYSTEM</span>
                             <span id="status-message">Ready to dispense.</span>
                         </div>
-                        <button id="generate-button" class="print-button" type="submit">
-                            <span class="print-button__light" aria-hidden="true"></span>
-                            <span>Print quest</span>
-                            <small>Engage local AI</small>
-                        </button>
-                        <button id="doomscroll-button" class="escape-button" type="button">
-                            <span>Doomscroll escape</span>
-                            <small>15 min · anywhere · surprise</small>
-                        </button>
+                        <div class="action-buttons">
+                            <button id="generate-button" class="print-button" type="submit">
+                                <span class="print-button__light" aria-hidden="true"></span>
+                                <span>Print quest</span>
+                                <small>Engage local AI</small>
+                            </button>
+                            <button id="doomscroll-button" class="escape-button" type="button">
+                                <span>⚡ Doomscroll escape</span>
+                                <small>15-min emergency quest</small>
+                            </button>
+                        </div>
                     </div>
                 </form>
 

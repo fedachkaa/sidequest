@@ -1,3 +1,4 @@
+from datetime import datetime
 from typing import Literal
 from pydantic import BaseModel, Field
 from enum import Enum
@@ -29,3 +30,12 @@ class Quest(BaseModel):
     difficulty: int = Field(ge=1, le=3)
     category: str
     tasks: list[str] = Field(min_length=3, max_length=3)
+
+
+class StoredQuest(Quest):
+    id: str
+    environment: Environment
+    mode: Mode
+    status: Literal["pending", "completed", "superseded"]
+    created_at: datetime
+    completed_at: datetime | None = None

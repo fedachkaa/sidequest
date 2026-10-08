@@ -21,3 +21,8 @@ htmlcov/
 *.log
 
 evaluation/results*.json
+
+data/
+*.db
+*.db-shm
+*.db-wal

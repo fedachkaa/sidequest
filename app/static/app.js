@@ -14,7 +14,7 @@ const anotherQuestButton = document.querySelector('#another-quest-button')
 const completeQuestButton = document.querySelector('#complete-quest-button')
 const completionConfirmation = document.querySelector('#completion-confirmation')
 const badgeList = document.querySelector('#badge-list')
-const storageWarning = document.querySelector('#storage-warning')
+const persistenceWarning = document.querySelector('#persistence-warning')
 
 const loadingMessages = [
     [0, 'Contacting the local quest engine…'],
@@ -28,7 +28,10 @@ let lastRequest = null
 let scrollFollowFrame = null
 let currentQuest = null
 let isGenerating = false
-let progress = Progress.loadProgress(getStorage())
+let isCompleting = false
+let isInitializing = true
+let progress = Progress.emptyProgress()
+let initializationPromise = null
 
 const scrollCancelEvents = ['wheel', 'touchstart', 'pointerdown', 'keydown']
 
@@ -44,14 +47,6 @@ function readQuestRequest() {
     }
 }
 
-function getStorage() {
-    try {
-        return window.localStorage
-    } catch (error) {
-        return null
-    }
-}
-
 function setSelectedValue(name, value) {
     const option = form.querySelector(`input[name="${name}"][value="${value}"]`)
     if (option) {
@@ -59,8 +54,18 @@ function setSelectedValue(name, value) {
     }
 }
 
-function showStorageWarning() {
-    storageWarning.hidden = false
+function showPersistenceWarning(message) {
+    persistenceWarning.textContent = message
+    persistenceWarning.hidden = false
+}
+
+async function responseError(response, fallback) {
+    try {
+        const payload = await response.json()
+        return new Error(Progress.errorMessage(payload.detail?.code, fallback))
+    } catch (error) {
+        return new Error(fallback)
+    }
 }
 
 async function fetchQuest(request) {
@@ -71,7 +76,7 @@ async function fetchQuest(request) {
     })
 
     if (!response.ok) {
-        throw new Error(response.status === 503 ? 'The local quest engine is unavailable right now.' : 'The machine received an unexpected response.')
+        throw await responseError(response, 'The machine received an unexpected response.')
     }
 
     const quest = await response.json()
@@ -80,6 +85,22 @@ async function fetchQuest(request) {
     }
 
     return quest
+}
+
+async function fetchProgress() {
+    const response = await fetch('/api/progress')
+    if (!response.ok) {
+        throw await responseError(response, 'The field record could not be loaded.')
+    }
+    return response.json()
+}
+
+async function fetchQuestStatus(questId) {
+    const response = await fetch(`/api/quests/${encodeURIComponent(questId)}`)
+    if (!response.ok) {
+        throw await responseError(response, 'The quest status could not be confirmed.')
+    }
+    return response.json()
 }
 
 function isQuest(quest) {
@@ -113,15 +134,14 @@ function renderReceipt(quest) {
 }
 
 function renderProgress() {
-    const today = Progress.localDateString(new Date())
-    document.querySelector('#stat-xp').textContent = progress.totalXp
-    document.querySelector('#stat-quests').textContent = progress.completedQuests
-    document.querySelector('#stat-minutes').textContent = progress.outsideMinutes
-    document.querySelector('#stat-streak').textContent = Progress.visibleStreak(progress, today)
+    document.querySelector('#stat-xp').textContent = progress.total_xp
+    document.querySelector('#stat-quests').textContent = progress.completed_quests
+    document.querySelector('#stat-minutes').textContent = progress.outside_minutes
+    document.querySelector('#stat-streak').textContent = progress.current_streak
 
     badgeList.replaceChildren()
     Progress.BADGES.forEach((badge) => {
-        const isUnlocked = progress.unlockedBadges.includes(badge.id)
+        const isUnlocked = progress.unlocked_badges.includes(badge.id)
         const item = document.createElement('div')
         const marker = document.createElement('span')
         const copy = document.createElement('div')
@@ -146,6 +166,7 @@ function startLoading() {
     form.classList.add('is-loading')
     generateButton.disabled = true
     doomscrollButton.disabled = true
+    completeQuestButton.disabled = true
     receiptStage.hidden = true
     errorPanel.hidden = true
     loadingMessages.forEach(([delay, message]) => {
@@ -172,17 +193,7 @@ function showReceipt(quest) {
     dispenseReceipt()
 }
 
-function restorePendingQuest() {
-    const storedQuest = Progress.loadPendingQuest(getStorage())
-    const pendingQuest = Progress.restorablePendingQuest(progress, storedQuest)
-
-    if (storedQuest && !pendingQuest) {
-        if (!Progress.clearPendingQuest(getStorage())) {
-            showStorageWarning()
-        }
-        return
-    }
-
+function restorePendingQuest(pendingQuest) {
     if (!pendingQuest) {
         return
     }
@@ -204,6 +215,19 @@ function restorePendingQuest() {
     receiptViewport.style.height = 'auto'
     receiptStage.hidden = false
     statusMessage.textContent = 'Unfinished quest restored. Ready when you return.'
+}
+
+async function loadProgress() {
+    try {
+        progress = await fetchProgress()
+        persistenceWarning.hidden = true
+        renderProgress()
+        restorePendingQuest(progress.pending_quest)
+    } catch (error) {
+        showPersistenceWarning('Field record unavailable. Refresh to try again.')
+    } finally {
+        isInitializing = false
+    }
 }
 
 function dispenseReceipt() {
@@ -286,7 +310,8 @@ function clearLoadingTimers() {
 }
 
 async function generateQuest(request) {
-    if (isGenerating) {
+    await initializationPromise
+    if (!Progress.operationAvailable({ isInitializing, isGenerating, isCompleting })) {
         return
     }
 
@@ -296,15 +321,7 @@ async function generateQuest(request) {
 
     try {
         const quest = await fetchQuest(request)
-        currentQuest = {
-            ...quest,
-            id: createQuestId(),
-            environment: request.environment,
-            mode: request.mode,
-        }
-        if (!Progress.savePendingQuest(getStorage(), currentQuest)) {
-            showStorageWarning()
-        }
+        currentQuest = quest
         showReceipt(currentQuest)
     } catch (error) {
         showError(error instanceof Error ? error : new Error('The machine could not print this quest.'))
@@ -313,36 +330,92 @@ async function generateQuest(request) {
     }
 }
 
-function createQuestId() {
-    if (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function') {
-        return globalThis.crypto.randomUUID()
+async function completeCurrentQuest() {
+    await initializationPromise
+    if (
+        !currentQuest ||
+        !Progress.operationAvailable({ isInitializing, isGenerating, isCompleting })
+    ) {
+        return
     }
-    return `${Date.now()}-${Math.random().toString(16).slice(2)}`
+
+    isCompleting = true
+    completeQuestButton.disabled = true
+    generateButton.disabled = true
+    doomscrollButton.disabled = true
+    const completingQuest = currentQuest
+    try {
+        const response = await fetch(`/api/quests/${encodeURIComponent(completingQuest.id)}/complete`, {
+            method: 'POST',
+        })
+        if (!response.ok) {
+            throw new Error('Completion could not be saved. Please try again.')
+        }
+
+        const result = await response.json()
+        progress = result.progress
+        renderProgress()
+        completeQuestButton.textContent = 'Quest logged'
+        persistenceWarning.hidden = true
+        const badgeMessage = result.new_badges.length > 0 ? ` · ${result.new_badges.length} badge unlocked` : ''
+        completionConfirmation.textContent = `FIELD LOG UPDATED · +${result.awarded_xp} XP${badgeMessage}`
+        completionConfirmation.hidden = false
+        currentQuest = null
+    } catch (error) {
+        await reconcileCompletion(completingQuest)
+    } finally {
+        isCompleting = false
+        generateButton.disabled = false
+        doomscrollButton.disabled = false
+    }
 }
 
-function completeCurrentQuest() {
-    if (!currentQuest) {
-        return
-    }
+async function reconcileCompletion(completingQuest) {
+    try {
+        const savedQuest = await fetchQuestStatus(completingQuest.id)
+        const resolution = Progress.completionResolution(savedQuest.status)
 
-    const result = Progress.completeQuest(progress, currentQuest, new Date())
-    if (!result.awarded) {
-        return
-    }
+        if (resolution === 'completed') {
+            currentQuest = null
+            completeQuestButton.disabled = true
+            completeQuestButton.textContent = 'Quest logged'
+            completionConfirmation.textContent = 'QUEST COMPLETION CONFIRMED · FIELD LOG UPDATED'
+            completionConfirmation.hidden = false
+            statusMessage.textContent = 'Quest completion confirmed.'
+            persistenceWarning.hidden = true
+            try {
+                progress = await fetchProgress()
+                renderProgress()
+            } catch (error) {
+                showPersistenceWarning('Completion was confirmed, but progress could not be refreshed.')
+            }
+            return
+        }
 
-    progress = result.progress
-    const isProgressSaved = Progress.saveProgress(getStorage(), progress)
-    const isPendingQuestCleared = Progress.clearPendingQuest(getStorage())
-    if (!isProgressSaved || !isPendingQuestCleared) {
-        showStorageWarning()
-    }
-    renderProgress()
-    completeQuestButton.disabled = true
-    completeQuestButton.textContent = 'Quest logged'
+        if (resolution === 'retry') {
+            currentQuest = completingQuest
+            completeQuestButton.disabled = false
+            showPersistenceWarning('Completion was not confirmed. Please try again.')
+            return
+        }
 
-    const badgeMessage = result.newBadges.length > 0 ? ` · ${result.newBadges.length} badge unlocked` : ''
-    completionConfirmation.textContent = `FIELD LOG UPDATED · +${result.xpAwarded} XP${badgeMessage}`
-    completionConfirmation.hidden = false
+        if (resolution === 'superseded') {
+            currentQuest = null
+            completeQuestButton.disabled = true
+            completeQuestButton.textContent = 'Quest superseded'
+            statusMessage.textContent = 'This quest was replaced and is no longer eligible for completion.'
+            showPersistenceWarning('This quest was superseded by a newer quest and cannot be completed.')
+            return
+        }
+
+        currentQuest = completingQuest
+        completeQuestButton.disabled = false
+        showPersistenceWarning('The device returned an unknown quest status. Completion was not confirmed.')
+    } catch (error) {
+        currentQuest = completingQuest
+        completeQuestButton.disabled = false
+        showPersistenceWarning('Could not confirm whether completion was saved. Check the connection before retrying.')
+    }
 }
 
 form.addEventListener('submit', (event) => {
@@ -355,7 +428,7 @@ retryButton.addEventListener('click', () => {
 })
 
 doomscrollButton.addEventListener('click', () => {
-    if (isGenerating) {
+    if (isGenerating || isCompleting) {
         return
     }
 
@@ -387,4 +460,4 @@ anotherQuestButton.addEventListener('click', () => {
 window.addEventListener('beforeprint', stopScrollFollow)
 
 renderProgress()
-restorePendingQuest()
+initializationPromise = loadProgress()
