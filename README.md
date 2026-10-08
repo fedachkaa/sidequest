@@ -25,3 +25,27 @@ into:
 ## 🚧 Status
 
 Currently in development for Hacktoberfest 2026 — Touch Grass Challenge.
+
+## Run locally
+
+SIDEQUEST stores generated quests and progress in `data/sidequest.db` by default.
+Set `SIDEQUEST_DB_PATH` to use a different SQLite file.
+
+```powershell
+ollama serve
+uv run uvicorn app.main:app --reload
+```
+
+Open `http://127.0.0.1:8000/` in a browser. The database schema and parent
+directory are created automatically on the first persistence request.
+
+Daily streaks use the local calendar date of the device running SIDEQUEST. Keep
+the device operating-system timezone configured for its physical location;
+streak boundaries occur at local midnight rather than after an elapsed 24 hours.
+
+Run the automated tests with:
+
+```powershell
+uv run pytest
+node --test tests/frontend_progress.test.js
+```

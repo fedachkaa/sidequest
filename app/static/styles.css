@@ -395,7 +395,8 @@ button {
 
 .action-deck {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(190px, 0.7fr);
+    grid-template-columns: minmax(0, 1fr) minmax(210px, 0.72fr);
+    align-items: stretch;
     gap: 18px;
     margin-top: 4px;
     padding: 18px;
@@ -403,6 +404,19 @@ button {
     border-radius: 10px;
     background: #d5cab4;
     box-shadow: inset 0 2px 5px rgba(86, 70, 45, 0.18);
+}
+
+.action-buttons {
+    display: grid;
+    min-width: 0;
+    grid-template-columns: minmax(0, 1fr);
+    align-content: stretch;
+    gap: 10px;
+}
+
+.action-buttons > button {
+    width: 100%;
+    min-width: 0;
 }
 
 .readout {
@@ -467,42 +481,49 @@ button {
 }
 
 .escape-button {
-    grid-column: 1 / -1;
     display: flex;
+    min-height: 52px;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 12px;
-    min-height: 38px;
-    padding: 8px 14px;
-    border: 1px solid #403b34;
-    border-radius: 5px;
-    color: var(--ink);
-    background: transparent;
-    box-shadow: 0 2px 0 #8f846f;
+    gap: 3px;
+    padding: 9px 10px;
+    border: 2px solid var(--orange);
+    border-radius: 7px;
+    color: #fff7e9;
+    background: linear-gradient(135deg, #292621, #171817);
+    box-shadow: 0 3px 0 #8f3515, inset 3px 0 0 var(--orange);
     cursor: pointer;
     font-family: var(--mono);
+    text-align: center;
     text-transform: uppercase;
+    transition: color 120ms ease, background 120ms ease, box-shadow 120ms ease, transform 120ms ease;
 }
 
 .escape-button span {
-    font-size: 0.74rem;
+    font-size: clamp(0.61rem, 1.45vw, 0.72rem);
     font-weight: 900;
-    letter-spacing: 0.07em;
+    letter-spacing: 0.035em;
+    white-space: nowrap;
 }
 
 .escape-button small {
-    color: var(--orange-dark);
-    font-size: 0.56rem;
-    letter-spacing: 0.04em;
+    color: #f7a276;
+    font-size: clamp(0.48rem, 1.15vw, 0.55rem);
+    letter-spacing: 0.035em;
+    line-height: 1.25;
+    white-space: nowrap;
 }
 
 .escape-button:hover:not(:disabled) {
-    color: var(--orange-dark);
+    color: #fff;
+    background: linear-gradient(135deg, #3a2b23, #1c1b19);
+    box-shadow: 0 4px 0 #8f3515, inset 4px 0 0 #ff8a4d, 0 0 0 1px rgba(255, 138, 77, 0.2);
     transform: translateY(-1px);
 }
 
 .escape-button:focus-visible {
-    outline: 3px solid rgba(233, 111, 50, 0.45);
+    outline: 3px solid #ffb183;
     outline-offset: 3px;
 }
 
@@ -881,6 +902,10 @@ button {
         padding: 13px;
     }
 
+    .action-buttons {
+        gap: 11px;
+    }
+
     .printer {
         margin-right: -7px;
         margin-left: -7px;
@@ -893,9 +918,8 @@ button {
     }
 
     .escape-button {
+        min-height: 58px;
         align-items: center;
-        flex-direction: column;
-        gap: 3px;
     }
 
     .page-footer {

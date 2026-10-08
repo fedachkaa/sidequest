@@ -5,6 +5,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.api.quests import router as quests_router
+from app.api.progress import router as progress_router
 
 
 STATIC_DIRECTORY = Path(__file__).parent / "static"
@@ -15,6 +16,7 @@ app = FastAPI(
 )
 
 app.include_router(quests_router)
+app.include_router(progress_router)
 app.mount("/static", StaticFiles(directory=STATIC_DIRECTORY), name="static")
 
 

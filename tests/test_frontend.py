@@ -13,6 +13,8 @@ def test_receipt_machine_is_served_at_root() -> None:
     assert response.headers["content-type"].startswith("text/html")
     assert "SIDEQUEST" in response.text
     assert 'id="quest-form"' in response.text
+    assert "⚡ Doomscroll escape" in response.text
+    assert "15-min emergency quest" in response.text
 
 
 def test_frontend_static_assets_are_served() -> None:
@@ -24,5 +26,8 @@ def test_frontend_static_assets_are_served() -> None:
     assert stylesheet_response.headers["content-type"].startswith("text/css")
     assert script_response.status_code == 200
     assert "javascript" in script_response.headers["content-type"]
+    assert "/api/progress" in script_response.text
+    assert "/complete" in script_response.text
+    assert "localStorage" not in script_response.text
     assert progress_script_response.status_code == 200
     assert "javascript" in progress_script_response.headers["content-type"]
